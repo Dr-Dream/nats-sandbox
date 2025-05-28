@@ -1,0 +1,72 @@
+config:
+  cluster:
+    enabled: true
+    port: 6222
+    # must be 2 or higher when jetstream is enabled
+    replicas: 3
+  nats:
+    port: 4222
+  gateway:
+    enabled: true
+    port: 7222
+  merge:
+    accounts:
+      $SYS:
+        users:
+          - user: sys
+            password: sys
+  monitor:
+    enabled: true
+    port: 8222
+    tls:
+      # config.nats.tls must be enabled also
+      # when enabled, monitoring port will use HTTPS with the options from config.nats.tls
+      # if promExporter is also enabled, consider setting promExporter.monitorDomain
+      enabled: false
+  resolver:
+    enabled: false
+    dir: /data/resolver
+    ############################################################
+    # stateful set -> volume claim templates -> resolver pvc
+    ############################################################
+    pvc:
+      enabled: true
+      size: 1Gi
+
+############################################################
+# stateful set -> pod template -> nats container
+############################################################
+reloader:
+  enabled: true
+
+promExporter:
+  enabled: true
+  port: 7777
+  ############################################################
+  # prometheus pod monitor
+  ############################################################
+  podMonitor:
+    enabled: true
+
+service:
+  enabled: true
+  ports:
+    nats:
+      enabled: true
+    leafnodes:
+      enabled: true
+    websocket:
+      enabled: true
+    mqtt:
+      enabled: true
+    cluster:
+      enabled: true
+    gateway:
+      enabled: true
+    monitor:
+      enabled: true
+
+# service account
+natsBox:
+  enabled: true
+
