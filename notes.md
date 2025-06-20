@@ -1,3 +1,9 @@
 kubectl -n nats exec -it deployment/nats-box -- nsc generate nkey --account
 SAACFEQTVQ5OZYLRKDJOZAZTGKSET3MQ7ZNVCX4XZZB22GSINMODQKIMTI
 ACNCPBSHRZUQLD35J27WJIHWT4AENGDBH3JQJ3BXNYOOBNYBNJZGK2AH
+
+
+https://www.synadia.com/blog/multi-cluster-consistency-models
+
+
+https://linkerd.io/2-edge/tasks/automatically-rotating-control-plane-tls-credentials/
