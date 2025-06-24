@@ -14,7 +14,7 @@ to play with NATs Superclusters and Stretched JetStream clusters. Also to play w
 NATs servers.
 
 How what we actually want to do and what tools will be used for this.
-* Two or more (three the best choice) Kubernetes clusters. We will use Kind for this.
+* Two or more (three the best choice) Kubernetes clusters. We will use K3D for this.
 * Grafana/Prometheus for monitoring. It will be kube-prometheus-stack to ease setup.
 * Ingress for NATs gateways. Vanilla nginx ingress controller for k8s.
 * Multicluster service mesh. Supposed to be required for Stretched NATs Cluster. Linkerd/Linkerd Multicluster.
