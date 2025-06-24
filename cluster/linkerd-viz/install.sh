@@ -6,7 +6,7 @@ CWD=$(dirname "$0")
 
 for cluster in "$@"
 do
-  kube_context="kind-$cluster"
+  kube_context="k3d-$cluster"
   echo "=== Installing linkerd viz "
   helm --kube-context="$kube_context" -n linkerd-viz upgrade --install --create-namespace \
     --set 'prometheus.enabled=false' \

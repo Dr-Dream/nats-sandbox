@@ -3,6 +3,6 @@
 
 for cluster in "$@"
 do
-    kube_context="kind-$cluster"
+    kube_context="k3d-$cluster"
     kubectl --context="$kube_context" delete namespace nats
 done

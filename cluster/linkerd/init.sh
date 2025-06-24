@@ -6,7 +6,7 @@ CWD=$(dirname "$0")
 
 for cluster in "$@"
 do
-  kube_context="kind-$cluster"
+  kube_context="k3d-$cluster"
   echo "========== $cluster ========="
   if ! kubectl --context="$kube_context" get ns linkerd; then
     echo "== Creating namespace"
@@ -41,6 +41,4 @@ do
   kubectl --context="$kube_context" -n linkerd wait Certificate linkerd-identity-issuer --for=condition=ready --timeout=30s
   echo "=== Waiting identity issuer certificate secret ==="
   kubectl --context="$kube_context" -n linkerd wait secret/linkerd-identity-issuer --for=create --timeout=30s
-
-
 done

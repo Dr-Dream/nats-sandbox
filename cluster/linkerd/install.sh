@@ -8,7 +8,7 @@ LINKERD_REPO=linkerd-edge
 
 for cluster in "$@"
 do
-  kube_context="kind-$cluster"
+  kube_context="k3d-$cluster"
   echo "=== Installs linkerd CRDs ==="
   helm --kube-context "$kube_context" upgrade --install \
     -n linkerd --create-namespace --set installGatewayAPI=true \

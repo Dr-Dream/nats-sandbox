@@ -8,7 +8,7 @@ LINKERD_REPO=linkerd-edge
 
 for cluster in "$@"
 do
-  kube_context="kind-$cluster"
+  kube_context="k3d-$cluster"
   echo "=== Installing linkerd multicluster "
   controllersJson=""
   for target in "$@";

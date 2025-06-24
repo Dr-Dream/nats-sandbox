@@ -1,0 +1,18 @@
+apiVersion: ingress.v1.haproxy.org/v1
+kind: TCP
+metadata:
+  name: nats-gateway-tcp
+  namespace: nats
+  annotations:
+    ingress.class: haproxy
+spec:
+  - name: nats-gw-tcp
+    frontend:
+      name: nats-gw
+      tcplog: true
+      binds:
+        - name: bind1
+          port: 7222
+    service:
+      name: $CLUSTER_NAME-gw-nats
+      port: 7222
