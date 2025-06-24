@@ -15,6 +15,11 @@ config:
         users:
           - user: sys
             password: sys
+      JS:
+        jetstream: enabled
+        users:
+          - user: js
+            password: js
   monitor:
     enabled: true
     port: 8222
@@ -39,6 +44,14 @@ config:
 reloader:
   enabled: true
 
+podTemplate:
+  merge:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "7777"
+
 promExporter:
   enabled: true
   port: 7777
@@ -47,26 +60,39 @@ promExporter:
   ############################################################
   podMonitor:
     enabled: true
+    merge:
+      metadata:
+        labels:
+          release: "prometheus"
 
 service:
   enabled: true
   ports:
     nats:
       enabled: true
-    leafnodes:
-      enabled: true
-    websocket:
-      enabled: true
-    mqtt:
-      enabled: true
     cluster:
-      enabled: true
-    gateway:
       enabled: true
     monitor:
       enabled: true
+    profiling:
+      enabled: true
+    websocket:
+      enabled: false
+    mqtt:
+      enabled: false
+    gateway:
+      enabled: false
 
 # service account
 natsBox:
   enabled: true
+  contexts:
+    default:
+      merge:
+        user: sys
+        password: sys
+    js:
+      merge:
+        user: js
+        password: js
 
