@@ -30,6 +30,7 @@ At least we have an Linux/Mac machine with sh/zsh on board. Good start, but we a
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/).
 * [Helm](https://helm.sh/docs/intro/install/).
 * [Linkerd](https://linkerd.io/2.18/getting-started/).
+* [Nats CLI](https://github.com/nats-io/natscli). To play with super cluster from local host
 
 > **_NOTE:_** Actually all of them are available in public repos with almost all package managers (yum, apt, homebrew etc...)
 
@@ -102,13 +103,18 @@ Following script will do all dirty work for you.
 ```
 Check [./cluster/linkerd/init.sh](./cluster/linkerd/init.sh) for more details.
 
-
 Next point is that we plan to have not only cluster level mesh but also multicluster mesh. So we need to exchange trust
 chains between clusters (as soon each cluster manages its own trust chain).
 ```shell
 ./cluster/linkerd-multicluster/key-exchange.sh c1 c2 c3
 ```
 Check [./cluster/linkerd-multicluster/key-exchange.sh](./cluster/linkerd-multicluster/key-exchange.sh) for more details.
+
+> **_NOTE:_**  Check Expiry dates on certs and issues.
+> Root: [./cluster/linkerd/linkerd-root-ca.yaml](./cluster/linkerd/linkerd-root-ca.yaml)
+> Identity: [./cluster/linkerd/linkerd-identity-issuer.yaml](./cluster/linkerd/linkerd-identity-issuer.yaml)
+> After their expiration they will be reissued and you need to exchange keys once more.
+
 
 #### Install linkerd
 [./cluster/linkerd/install.sh](./cluster/linkerd/install.sh)
@@ -143,6 +149,19 @@ Just a simple linkerd dashboard on same prometheus instance. Also some linkerd p
 ./cluster/haproxy-ingress/install.sh c1 c2 c3
 ```
 
+### SOME NOTE ABOUT IPs.
+Sadly but in most cases we rely on LoadBalancer services with dynamic IP. Which actually could change so we refer nodes
+DNS names instead of IP. k3d-[cluster name]-server-0 for linkerd gateways and k3d-[cluster name]-agent-0 for nats 
+ingress connections (gateways 7222).
+It is not mandatory due fact that all LoadBalancer services exposed on all nodes. This just FYI.
+
+### VERY IMPORTANT NOTE!
+In terms of resource consumption k3d not starting clusters with large number of pods (our case actually). So to start
+clusters we could use helper script.
+```shell
+./cluster/start.sh c1 c2 c3
+```
+
 ### Finally we back to nats
 What will be installed. At each k8s cluster we will install NTS cluster with
 * Core NATS Seed Nodes (nats)
@@ -163,8 +182,44 @@ All clusters will be interconnected in NATS SuperCluster so it will be 36 nodes 
 ./nats/install-supercluster.sh c1 c2 c3
 ```
 
-Running nats client supposed to be something like this:
+### Setting up local cli
+We deployed cluster with two predefined accounts SYS: 
+* SYS (username=sys, password=sys) is a system operator. Other words super root for nats.
+* JS (username=js, password=js) is stream enabled operator (it can't be sys).
+
+#### Connectivity
+First of all we need to have connection to any servers that located in clusters. Fortunately, we already exposed 4222 
+port through haproxy ingress pointing to Seed cluster. So we just need to expose this ports to host.
+As soon we have Super Cluster we don't care which cluster we will be connected. Let it be c1
 ```shell
+k3d cluster edit c1 --port-add "4222:4222@loadbalancer"
+```
+More info you can find in [K3D expose docs](https://k3d.io/stable/usage/exposing_services/).
+
+#### Nats contexts
+Lets add contexts to nats cli.
+```shell
+nats context add --user sys --password sys --description "NATS Seed C1 SYS" --server nats://localhost:4222 c1
+```
+```shell
+nats context add --user js --password js --description "NATS Seed C1 JS" --server nats://localhost:4222 c1-js
+```
+
+
+After that, select account you want to play with.
+```shell
+nats context select c1
+```
+> **_NOTE:_**  Be sure you are using right context SYS account don't have any JetStream permissions 
+> (any nats stream command will fail). At same time JS account don't have any permissions to manage servers or clusters.
+
+List servers:
+```shell
+nats server list --sort=name
+```
+
+Running nats client supposed to be something like this:
+```
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                          Server Overview                                                          │
 ├─────────────────┬─────────┬──────┬─────────┬─────┬───────┬────────┬────────┬─────┬─────────┬───────┬───────┬──────┬────────┬──────┤
@@ -224,3 +279,18 @@ Running nats client supposed to be something like this:
 ╰─────────┴────────────┴───────────────────┴───────────────────┴─────────────╯
 
 ```
+
+## Clean UP
+Just delete K3D clusters. :)
+```shell
+./cluster/delete.sh c1 c2 c3
+```
+
+## TODO:
+- [] Websockets and Leafnodes?
+- [] JWT Authentication
+- [] KV Tests
+- [] Strong consistency Cross-Region Stream example
+- [] Eventual consistency Cross-Region example
+- [] Handle host and cluster restarts 
+- [] Accessing Grafana

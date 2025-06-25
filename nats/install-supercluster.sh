@@ -17,30 +17,13 @@ sep=""
 
 for cluster in "$@"
 do
-    kube_context="k3d-$cluster"
-    externalIp=$(kubectl --context="$kube_context" -n haproxy-ingress get svc/haproxy-ingress-kubernetes-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    externalIp="k3d-$cluster-agent-0"
 
-#    echo "!!! $externalIp"
-#    externalIp="k3d-$cluster-serverlb"
-
-    externalIps=$(kubectl --context="$kube_context" -n haproxy-ingress get svc/haproxy-ingress-kubernetes-ingress -o=jsonpath='{.status.loadBalancer.ingress[*].ip}')
-    clusterGwUrls=""
-    gwSep=""
-    for ip in $externalIps; do
-        clusterGwUrls="$clusterGwUrls$gwSep\"nats://$GATEWAY_USER:$GATEWAY_PASSWORD@$ip:$GATEWAY_PORT\""
-        gwSep=","
-    done
-    #echo "!!!$clusterGwUrls"
-    #externalIp="k3d-$cluster-serverlb"
     echo "$cluster external ip=$externalIp";
     baseGatewayRoutes="$baseGatewayRoutes$sep{\"name\":\"$cluster\",\"url\":\"nats://$GATEWAY_USER:$GATEWAY_PASSWORD@$externalIp:7222\"}"
     xrGwRoutes="$xrGwRoutes$sep""\"nats://$GATEWAY_USER:$GATEWAY_PASSWORD@xr-js-nats-$cluster:$GATEWAY_PORT\""
     sep=","
 done
-
-#baseGatewayRoutes="$baseGatewayRoutes,{\"name\":\"xr-js\",\"urls\":[$xrGwRoutes]}"
-
-echo "config.gateway.merge.gateways=[$baseGatewayRoutes]"
 
 for cluster in "$@"
 do
@@ -53,18 +36,16 @@ do
     echo "=== injecting linkerd into namespace"
     kubectl --context="$kube_context" annotate namespace nats linkerd.io/inject=enabled
 
-    externalIp=$(kubectl --context="$kube_context" -n haproxy-ingress get svc/haproxy-ingress-kubernetes-ingress -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    externalIp="k3d-$cluster-server-0"
 
     seedRoutes="nats://$cluster-nats-0.$cluster-nats-headless:6222,nats://$cluster-nats-1.$cluster-nats-headless:6222,nats://$cluster-nats-2.$cluster-nats-headless:6222"
     jsRoutes="nats://$cluster-js-nats-0.$cluster-js-nats-headless:6222,nats://$cluster-js-nats-1.$cluster-js-nats-headless:6222,nats://$cluster-js-nats-2.$cluster-js-nats-headless:6222"
     gwRoutes="nats://$cluster-gw-nats-0.$cluster-gw-nats-headless:6222,nats://$cluster-gw-nats-1.$cluster-gw-nats-headless:6222,nats://$cluster-gw-nats-2.$cluster-gw-nats-headless:6222"
     xrClusterRoutes="nats://xr-js-nats-0.xr-js-nats-headless:6222,nats://xr-js-nats-1.xr-js-nats-headless:6222,nats://xr-js-nats-2.xr-js-nats-headless:6222"
-#    xrGatewayUrls='"nats://xr-js-nats:7222"'
     for target in "$@"
     do
       if [ "$cluster" = "$target" ]; then continue; fi;
       xrClusterRoutes="$xrClusterRoutes,nats://xr-js-nats-0.xr-js-nats-headless-$target:6222,nats://xr-js-nats-1.xr-js-nats-headless-$target:6222,nats://xr-js-nats-2.xr-js-nats-headless-$target:6222"
-#      xrGatewayUrls="$xrGatewayUrls,\"nats://xr-js-nats-$cluster:7222\""
     done
 
     gatewayRoutes="$baseGatewayRoutes,{\"name\":\"xr-js\",\"url\":\"nats://xr-js-nats:7222\"}"
@@ -85,7 +66,6 @@ do
       "$cluster" nats/nats
 
     echo "=== Installing JetStream nodes ==="
-
     helm --kube-context="$kube_context" upgrade --install \
       -n nats --create-namespace \
       -f ./nats/cluster.yaml \
@@ -150,6 +130,7 @@ do
 
     export CLUSTER_NAME=$cluster
     envsubst < "$CWD/haproxy-gw-tcp.yml" | kubectl --context "$kube_context" -n nats apply -f -
+    envsubst < "$CWD/haproxy-cluster-tcp.yml" | kubectl --context "$kube_context" -n nats apply -f -
     envsubst < "$CWD/xr-js.yml" | kubectl --context "$kube_context" -n nats apply -f -
 
 done

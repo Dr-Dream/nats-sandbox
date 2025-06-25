@@ -3,8 +3,6 @@
 set -e
 CWD=$(dirname "$0")
 
-#    --set "controller.service.ports.nats-gw=7222" \
-
 for cluster in "$@"
 do
   kube_context="k3d-$cluster"
@@ -17,16 +15,16 @@ do
   echo "=== injecting linkerd into namespace"
   kubectl --context="$kube_context" annotate namespace haproxy-ingress linkerd.io/inject=enabled
 
-  #controller.podAnnotations
-  #controller.service.annotations
-
   echo "=== Installing haproxy ingress controller "
-  helm --kube-context="$kube_context" -n haproxy-ingress upgrade --install --create-namespace \
+  helm --kube-context="$kube_context" -n haproxy-ingress upgrade --install --create-namespace --wait \
     --set 'controller.ingressClassResource.default=true' \
     --set 'controller.service.type=LoadBalancer' \
     --set 'controller.service.tcpPorts[0].name=nats-gw' \
     --set 'controller.service.tcpPorts[0].port=7222' \
     --set 'controller.service.tcpPorts[0].targetPort=7222' \
+    --set 'controller.service.tcpPorts[1].name=nats-cluster' \
+    --set 'controller.service.tcpPorts[1].port=4222' \
+    --set 'controller.service.tcpPorts[1].targetPort=4222' \
     --set 'controller.podMonitor.enabled=true' \
     --set 'controller.serviceMonitor.enabled=true' \
     --set-json "controller.podAnnotations.config\.linkerd\.io\/opaque-ports=\"4222,6222,7222,8222\"" \

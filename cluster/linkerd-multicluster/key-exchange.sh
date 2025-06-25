@@ -8,7 +8,7 @@ for cluster in "$@";
 do
   kube_context="k3d-$cluster"
   echo "=== Creating trust bundle ===="
-#  kubectl --context="$kube_context" -n linkerd apply -f "$CWD/linkerd-ca-bundle.yaml"
+
   for target in "$@";
   do
     if [ "$cluster" = "$target" ]; then continue; fi;

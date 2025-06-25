@@ -1,6 +1,0 @@
-controllers:
-- link:
-    ref:
-      name: k3d-east
-  logLevel: debug
-  enableHeadlessServices: true
