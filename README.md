@@ -7,7 +7,7 @@
 > BEFORE RUNNING SCRIPTS BE SURE YOU UNDERSTAND WHAT YOU ARE DOING.
 
 
-## Overview
+## Idea
 
 The goal of this repo is to have some easy utils to install locally multicluster environment
 to play with NATs Superclusters and Stretched JetStream clusters. Also to play with different type of
@@ -19,18 +19,94 @@ How what we actually want to do and what tools will be used for this.
 * Ingress for NATs gateways. Vanilla nginx ingress controller for k8s.
 * Multicluster service mesh. Supposed to be required for Stretched NATs Cluster. Linkerd/Linkerd Multicluster.
 
-#### TODO: Overall diagram
+#### Overall overview
+More ore less planned deployment will look like this.
+![Overall diagram](./docs/images/Overall.drawio.svg)
+
+Let's dive in details.
+##### 3 k8s clusters. 
+K3D helps. (K8S Cluster C1,C2,C3 on diagram)
+#### Nats regional clusters and Super Cluster
+In terms of nats we want to have 1 nats cluster which will contain following nodes:
+* 3 Core Nats servers as seed nodes for cluster (nats). This core NATS servers with simple pub/sub functionality. Also mentioned in documentation as computing nodes.
+* 3 JetStream enabled (nats-js). In terms of NATS this is nodes that manges Streams/KV Stores/Object Stores. Actually it is cluster wide storage (file or memory) providers.
+* 3 Core Nats for gateways (nats-gw). Actually same as nats, but only them will be used as gateways. Just for traffic isolation. So gateways used for forming super cluster. 
+
+To make cluster all nodes should be strongly connected. All should be able will talk to each other and exchange 
+information about other nodes. Its done by each server configuration. More info in [Clustering](https://docs.nats.io/running-a-nats-service/configuration/clustering) docs.
+
+So in one K8S cluster we will form one Regional Cluster. Finally it will have 9 nodes. 3 computing 3 storage an 3 gateways.
+
+Gateways will expose port 7222 (nats gateway) in ingress as TCP (not http service). Also in all NATS servers we will sign public adressess of ingresses of other clusters.
+Doing this we will make possible all local nodes to talk to the nodes in other clusters. So all nodes in all clusters 
+will have information about all other nodes and routes how to reach them.
+
+That what is called Super Cluster in terms of NATS.
+More information about gateways and clusters you can find in [official documentation](https://docs.nats.io/running-a-nats-service/configuration/gateways)
+
+#### NATS JetStream/Stretched Cluster
+Why we need JetStream? What is it?
+Actually if we take Core NATS Pub/Sub functionality it works superfast and right in time. You pub message an consumer on 
+other side get it as soon it was published. Problem is that if you publish something, but nobody listening (subscribed) 
+Core NATS just drop this message. You can detect this situation on publisher side, but anyway.
+Other words publisher and subscriber is time coupled. Both of them shold be connected to the system at same time.
+To solve this problem yo should have layer of persistence. Where you store message until it will be consumed.
+
+JetStream (storage enabled) Nats clusters are little bit aside of core nats. It looks like PUB/SUB but in NATS 
+documentation it often called Produce/Consume. You can produce and consume whenever you want.
+
+As soon we talk about storing and reading (persisting) data it is all about consistency.
+Here is a good [article on synadia](https://www.synadia.com/blog/multi-cluster-consistency-models) (Synadia = NATS Cloud)
+about consistency in nats.
+
+There are some points about JetStream and how it works. When you create some stream it is scoped by the single NATS 
+cluster. Even if you create a Super Cluster (cluster of cluster) stream data and all replicas will be located in one 
+NATS cluster.
+
+So, let's just deploy new cluster with nodes in each K8S Cluster. They will be located in other Kubernetes Cluster, but 
+will be part of single NATS CLuster.
+
+Thats why we deploy 9 nodes called xr-js (c1,c2,c3) on scheme, three in each cluster.
+
+As soon it is a single cluster they all should be strongly connected (each to each).
+To make them available for stream creation we also connect them to Regional Cluster through gateways.
+
+One thing about xr-js cluster is that we don't plan to have dedicated nodes for computing, storage and gateways 
+(i'm too lazy for this), but make all of them having all three roles (Core,JetStream,Gateway).
+
+#### Interconnection between clusters.
+There are three main aspects of clusters interconnection.
+1) All nodes talks to the other clusters gateways through Ingress.
+2) xr-js talks to each other through linkerd multicluster gateways.
+3) xr-js nodes talks to Regional clusters through local NATS gateway services. (as soon nodes present in each cluster)
+
+Why so?
+Technically in this stand it will be same network, so no actual reason.
+
+Logically - yes. I just want to highlight point that xr-js nats traffic much more sensitive to RTT and Network Address translation then gateway.
+Traffic between members of single nats traffic much more intensive.
+
+So we suppose that GW interconnection is behind NAT and LoadBalancer, and more latent. (Blue network on scheme)
+XR-JS traffic comes from durable low latent cluster interconnection. (Green network on scheme)
+(discussible, but for now i just say so :))
 
 Let's start from the beginning.
 
-### Local machine requirements
+### System requirements.
+Actually its a just simple testing stand so you don't need Big server platforms to run. Moreover, i really don't
+recommend to run any havy lifting on it (heavy load-tests and benchmarks).
+Beside this so there is no requests and limits defined on most of pods just to run on anything that could start it.
+At time of writing this doc stand takes in **idle** it takes around **4 vCPU and 12Gi of RAM without any load**. Be
+aware that in case of nats bench and etc you will need much more resources (at least CPU).
+
+### Software requirements.
 At least we have an Linux/Mac machine with sh/zsh on board. Good start, but we also will require.
 * [Docker](https://docs.docker.com/engine/install/). Engine and CLI. [docker-desktop](https://www.docker.com/products/docker-desktop/) is enough.
 * [K3D](https://k3d.io/stable/).
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/).
 * [Helm](https://helm.sh/docs/intro/install/).
 * [Linkerd](https://linkerd.io/2.18/getting-started/).
-* [Nats CLI](https://github.com/nats-io/natscli). To play with super cluster from local host
+* [Nats CLI](https://github.com/nats-io/natscli). To play with Super Cluster from host machine.
 
 > **_NOTE:_** Actually all of them are available in public repos with almost all package managers (yum, apt, homebrew etc...)
 
@@ -48,7 +124,13 @@ helm repo add linkerd https://helm.linkerd.io/stable
 # NATs helm charts
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update 
 ```
-
+## Installing clusters
+If you don't want to dive deeply what happening you should just run
+```shell
+./cluster/install.sh c1 c2 c3
+```
+At the end 
+And skip it to [Installation of NATS](#nats_install)
 
 ### Creating a clusters.
 So let's create our k8s clusters. It will be one node for control-plane (called server in k3d) and two workers
@@ -162,12 +244,12 @@ clusters we could use helper script.
 ./cluster/start.sh c1 c2 c3
 ```
 
-### Finally we back to nats
+### <a name="nats_install"></a> Finally we back to nats
 What will be installed. At each k8s cluster we will install NTS cluster with
 * Core NATS Seed Nodes (nats)
-* Jetstream Enabled Nodes (nats-js)
+* JetStream Enabled Nodes (nats-js)
 * Gateway nodes that will be exposed through ingress to create a Nats Super Cluster (nats-gw)
-* Cross-Region 'stretched' Jetstream enabled cluster with in each cluster and interconnected
+* Cross-Region 'stretched' JetStream enabled nodes with in each cluster and interconnected
   through linkerd multicluster mesh. (xr-js)
 
 So we will have a cluster in each Kubernetes cluster (let's call it datacenter). Nats clusters will be 'c1' 'c2' 'c3'
@@ -176,7 +258,7 @@ and 'xr-js'.
 Clusters will contain three nodes of each type (nats, nats-js and nats-gw) so nine nodes in each. Beside this we will
 have three nodes for xr-js cluster in each datacenter (nine xr-js nodes).
 
-All clusters will be interconnected in NATS SuperCluster so it will be 36 nodes SuperCluster with 18 nodes for JetStream.
+All clusters will be interconnected in NATS SuperCluster, so it will be 36 nodes SuperCluster with 18 nodes for JetStream.
 
 ```shell
 ./nats/install-supercluster.sh c1 c2 c3
@@ -279,18 +361,16 @@ Running nats client supposed to be something like this:
 ╰─────────┴────────────┴───────────────────┴───────────────────┴─────────────╯
 
 ```
-
 ## Clean UP
 Just delete K3D clusters. :)
 ```shell
 ./cluster/delete.sh c1 c2 c3
 ```
-
 ## TODO:
-- [] Websockets and Leafnodes?
-- [] JWT Authentication
-- [] KV Tests
-- [] Strong consistency Cross-Region Stream example
-- [] Eventual consistency Cross-Region example
-- [] Handle host and cluster restarts 
-- [] Accessing Grafana
+- [ ] Websockets and Leafnodes?
+- [ ] JWT Authentication
+- [ ] KV Tests
+- [ ] Strong consistency Cross-Region Stream example
+- [ ] Eventual consistency Cross-Region example
+- [ ] Handle host and cluster restarts 
+- [ ] Accessing Grafana
