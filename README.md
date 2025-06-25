@@ -27,7 +27,7 @@ Let's dive in details.
 ##### 3 k8s clusters. 
 K3D helps. (K8S Cluster C1,C2,C3 on diagram)
 #### Nats regional clusters and Super Cluster
-In terms of nats we want to have 1 nats cluster which will contain following nodes:
+In terms of nats we want to have 1 nats cluster in each K8S Cluster which will contain following nodes:
 * 3 Core Nats servers as seed nodes for cluster (nats). This core NATS servers with simple pub/sub functionality. Also mentioned in documentation as computing nodes.
 * 3 JetStream enabled (nats-js). In terms of NATS this is nodes that manges Streams/KV Stores/Object Stores. Actually it is cluster wide storage (file or memory) providers.
 * 3 Core Nats for gateways (nats-gw). Actually same as nats, but only them will be used as gateways. Just for traffic isolation. So gateways used for forming super cluster. 
