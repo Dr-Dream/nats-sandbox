@@ -2,15 +2,15 @@
 
 ## DISCLAIMER
 > THIS REPO IS DONE JUST FOR FUN TO EASE SETUP MULTICLUSTER NATS ENVIRONMENT.
-> I STRONGLY **NOT** RECOMMEND TO USE ANY OF THIS SCRIPTS AND/OR CONFIGURATIONS IN PRODUCTION DUE PERFORMANCE AND SECURITY ISSUES.
+> I STRONGLY **NOT** RECOMMEND TO USE ANY OF THESE SCRIPTS AND/OR CONFIGURATIONS IN PRODUCTION DUE PERFORMANCE AND SECURITY ISSUES.
 > THIS SCRIPTS AND RESULTS OF IT WORK IS ONLY FOR EDUCATIONAL PURPOSES.
-> BEFORE RUNNING SCRIPTS BE SURE YOU UNDERSTAND WHAT YOU ARE DOING.
+> BEFORE RUNNING SCRIPTS, BE SURE YOU UNDERSTAND WHAT YOU ARE DOING.
 
 
 ## Idea
 
 The goal of this repo is to have some easy utils to install locally multicluster environment
-to play with NATs Superclusters and Stretched JetStream clusters. Also to play with different type of
+to play with NATs Superclusters and Stretched JetStream clusters. Also to play with a different type of
 NATs servers.
 
 How what we actually want to do and what tools will be used for this.
@@ -21,86 +21,86 @@ How what we actually want to do and what tools will be used for this.
 
 #### Overall overview
 More ore less planned deployment will look like this.
-![Overall diagram](./docs/images/Overall.drawio.svg)
+![Overall diagram](./docs/images/Overall.drawio.svg "Overall diagram")
 
 Let's dive in details.
-##### 3 k8s clusters. 
+##### Three k8s clusters. 
 K3D helps. (K8S Cluster C1,C2,C3 on diagram)
-#### Nats regional clusters and Super Cluster
-In terms of nats we want to have 1 nats cluster in each K8S Cluster which will contain following nodes:
-* 3 Core Nats servers as seed nodes for cluster (nats). This core NATS servers with simple pub/sub functionality. Also mentioned in documentation as computing nodes.
-* 3 JetStream enabled (nats-js). In terms of NATS this is nodes that manges Streams/KV Stores/Object Stores. Actually it is cluster wide storage (file or memory) providers.
-* 3 Core Nats for gateways (nats-gw). Actually same as nats, but only them will be used as gateways. Just for traffic isolation. So gateways used for forming super cluster. 
+##### Nats Regional clusters and Super Cluster
+In terms of NATS, we want to have one nats cluster in each K8S Cluster that will contain the following nodes:
+* Three Core Nats servers as seed nodes for cluster (nats). This core NATS servers with simple pub/sub functionality. Also mentioned in documentation as computing nodes.
+* Three JetStream enabled (nats-js). In terms of NATS, this is nodes that manage Streams/KV Stores/Object Stores. Actually, it is cluster wide storage (file or memory) providers.
+* Three Core Nats for gateways (nats-gw). Actually same as nats, but only them will be used as gateways. Just for traffic isolation. So gateways are used for forming supercluster. 
 
-To make cluster all nodes should be strongly connected. All should be able will talk to each other and exchange 
-information about other nodes. Its done by each server configuration. More info in [Clustering](https://docs.nats.io/running-a-nats-service/configuration/clustering) docs.
+To make cluster, all nodes should be strongly connected. All should be able to talk to each other and exchange 
+information about other nodes. It's done by each server configuration. More info in [Clustering](https://docs.nats.io/running-a-nats-service/configuration/clustering) docs.
 
-So in one K8S cluster we will form one Regional Cluster. Finally it will have 9 nodes. 3 computing 3 storage an 3 gateways.
+So in one K8S cluster, we will form one Regional Cluster. Finally, it will have nine nodes. 3 computing 3 storage an 3 gateways.
 
-Gateways will expose port 7222 (nats gateway) in ingress as TCP (not http service). Also in all NATS servers we will sign public adressess of ingresses of other clusters.
-Doing this we will make possible all local nodes to talk to the nodes in other clusters. So all nodes in all clusters 
+Gateways will expose port 7222 (NATS gateway) in ingress as TCP (not http service). Also in all NATS servers, we will sign public adressess of ingresses of other clusters.
+Doing this, we will make possible all local nodes to talk to the nodes in other clusters. So all nodes in all clusters 
 will have information about all other nodes and routes how to reach them.
 
-That what is called Super Cluster in terms of NATS.
+That is what is called Super Cluster in terms of NATS.
 More information about gateways and clusters you can find in [official documentation](https://docs.nats.io/running-a-nats-service/configuration/gateways)
 
-#### NATS JetStream/Stretched Cluster
-Why we need JetStream? What is it?
-Actually if we take Core NATS Pub/Sub functionality it works superfast and right in time. You pub message an consumer on 
-other side get it as soon it was published. Problem is that if you publish something, but nobody listening (subscribed) 
-Core NATS just drop this message. You can detect this situation on publisher side, but anyway.
-Other words publisher and subscriber is time coupled. Both of them shold be connected to the system at same time.
-To solve this problem yo should have layer of persistence. Where you store message until it will be consumed.
+##### NATS JetStream/Stretched Cluster
+Why do we need JetStream? What is it?
+Actually, if we take Core NATS Pub/Sub functionality, it works superfast and right in time. You pub message a consumer on 
+the other side get it as soon as it was published. The Problem is that if you publish something, but nobody listening (subscribed) 
+to Core NATS just drops this message. You can detect this situation on the publisher side, but anyway.
+In Other words, publisher and subscriber are time coupled. Both of them should be connected to the system at the same time.
+To solve this problem, you should have a layer of persistence. Where you store message until it will be consumed.
 
-JetStream (storage enabled) Nats clusters are little bit aside of core nats. It looks like PUB/SUB but in NATS 
-documentation it often called Produce/Consume. You can produce and consume whenever you want.
+JetStream (storage enabled) Nats clusters are a little bit aside of core nats. It looks like PUB/SUB, but in NATS 
+documentation it is often called Produce/Consume. You can produce and consume whenever you want.
 
-As soon we talk about storing and reading (persisting) data it is all about consistency.
+As soon as we talk about storing and reading (persisting) data, it is all about consistency.
 Here is a good [article on synadia](https://www.synadia.com/blog/multi-cluster-consistency-models) (Synadia = NATS Cloud)
 about consistency in nats.
 
-There are some points about JetStream and how it works. When you create some stream it is scoped by the single NATS 
+There are some points about JetStream and how it works. When you create some stream, it is scoped by the single NATS 
 cluster. Even if you create a Super Cluster (cluster of cluster) stream data and all replicas will be located in one 
 NATS cluster.
 
-So, let's just deploy new cluster with nodes in each K8S Cluster. They will be located in other Kubernetes Cluster, but 
+So, let's just deploy new cluster with nodes in each K8S Cluster. They will be located in other Kubernetes Cluster but 
 will be part of single NATS CLuster.
 
-Thats why we deploy 9 nodes called xr-js (c1,c2,c3) on scheme, three in each cluster.
+That's why we deploy nine nodes called xr-js (c1,c2,c3) on a scheme, three in each cluster.
 
-As soon it is a single cluster they all should be strongly connected (each to each).
-To make them available for stream creation we also connect them to Regional Cluster through gateways.
+As soon as it is a single cluster, they all should be strongly connected (each to each).
+To make them available for stream creation, we also connect them to Regional Cluster through gateways.
 
 One thing about xr-js cluster is that we don't plan to have dedicated nodes for computing, storage and gateways 
-(i'm too lazy for this), but make all of them having all three roles (Core,JetStream,Gateway).
+(I'm too lazy for this), but make all of them have all three roles (Core, JetStream, Gateway).
 
 #### Interconnection between clusters.
-There are three main aspects of clusters interconnection.
-1) All nodes talks to the other clusters gateways through Ingress.
+There are three main aspects of cluster interconnection.
+1) All nodes talk to the other clusters gateways through Ingress.
 2) xr-js talks to each other through linkerd multicluster gateways.
-3) xr-js nodes talks to Regional clusters through local NATS gateway services. (as soon nodes present in each cluster)
+3) xr-js nodes talk to Regional clusters through local NATS gateway services. (as soon nodes present in each cluster)
 
 Why so?
-Technically in this stand it will be same network, so no actual reason.
+Technically, in this stand it will be the same network, so no actual reason.
 
-Logically - yes. I just want to highlight point that xr-js nats traffic much more sensitive to RTT and Network Address translation then gateway.
-Traffic between members of single nats traffic much more intensive.
+Logically—yes. I just want to highlight point that xr-js nats traffic is much more sensitive to RTT and Network Address translation then gateway.
+Traffic between members of single nats traffic is much more intensive.
 
-So we suppose that GW interconnection is behind NAT and LoadBalancer, and more latent. (Blue network on scheme)
-XR-JS traffic comes from durable low latent cluster interconnection. (Green network on scheme)
-(discussible, but for now i just say so :))
+So we suppose that GW interconnection is behind NAT and LoadBalancer, and more latent. (Blue network on a scheme)
+XR-JS traffic comes from durable low latent cluster interconnection. (Green network on a scheme)
+(discussible, but for now I just say so :))
 
 Let's start from the beginning.
 
 ### System requirements.
-Actually its a just simple testing stand so you don't need Big server platforms to run. Moreover, i really don't
-recommend to run any havy lifting on it (heavy load-tests and benchmarks).
-Beside this so there is no requests and limits defined on most of pods just to run on anything that could start it.
-At time of writing this doc stand takes in **idle** it takes around **4 vCPU and 12Gi of RAM without any load**. Be
-aware that in case of nats bench and etc you will need much more resources (at least CPU).
+Actually, its just simple testing stand so you don't need Big server platforms to run. Moreover, I really don't
+recommend running any heavy lifting on it (heavy load-tests and benchmarks).
+Besides this, so there are no requests and limits defined on most of the pods just to run on anything that could start it.
+At the time of writing, this doc stand takes in **idle** it takes around **4 vCPU and 12Gi of RAM without any load**. Be
+aware that in case of nat bench (etc...), you will need many more resources (at least CPU).
 
 ### Software requirements.
-At least we have an Linux/Mac machine with sh/zsh on board. Good start, but we also will require.
+At least we have a Linux/Mac machine with sh/zsh on board. Good start, but we also will require.
 * [Docker](https://docs.docker.com/engine/install/). Engine and CLI. [docker-desktop](https://www.docker.com/products/docker-desktop/) is enough.
 * [K3D](https://k3d.io/stable/).
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/).
@@ -125,29 +125,29 @@ helm repo add linkerd https://helm.linkerd.io/stable
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update 
 ```
 ## Installing clusters
-If you don't want to dive deeply what happening you should just run
+If you want a deep dive, skip this part to [Creating a clusters](#cluster_create).
+Or else, if you don't want to dive deeply what happening, you should just run:
 ```shell
 ./cluster/install.sh c1 c2 c3
 ```
-At the end 
-And skip it to [Installation of NATS](#nats_install)
+At the end you will get Three Meshed K8S clusters with Grafana/Ingress ready for [installation of NATS](#nats_install).
 
-### Creating a clusters.
+### <a name="cluster_create"></a>Creating a clusters.
 So let's create our k8s clusters. It will be one node for control-plane (called server in k3d) and two workers
 (called agents).
 ```shell
 ./cluster/create.sh c1 c2 c3
 ```
-By the end of script you will have three clusters ready to use.
+By the end of the script, you will have three clusters ready to use.
 * c1 (kubectl context will be 'k3d-c1')
 * c2 (kubectl context will be 'k3d-c2')
 * c3 (kubectl context will be 'k3d-c3')
 
 You can use whatever naming you want but remember those cluster names (c1,c2,c3), they will be
-used in later stages to identify clusters inside scripts and should be passed same way to other scripts.
+used in later stages to identify clusters inside scripts and should be passed the same way to other scripts.
 
 All nodes will be connected to internal clusters (depending on their membership) with flannel cni (k3d default).
-But also all nodes connected to single docker network called "linkerd-idc" for clusters interconnection.
+But also all nodes connected to a single docker network called "linkerd-idc" for clusters interconnection.
 
 You can check [./create.sh](./cluster/create.sh).
 
@@ -158,7 +158,7 @@ We have clusters and planning to interact with services inside clusters,
 we will need something that will expose it for us. At least we want to reach ingress controllers.
 Fortunately, k3d have load balancer out of the box. So all LoadBalancer services balanced on each node of the cluster.
 
-For each cluster, we also have special container to expose LoadBalancer services to the host which is called
+For each cluster, we also have a special container to expose LoadBalancer services to the host which is called
 'k3d-[cluster name]-serverlb'.
 
 It will expose all services with type LoadBalancer to host machine.
@@ -170,32 +170,32 @@ things in our setup.
 ```shell
 ./cluster/cert-manager/install.sh c1 c2 c3
 ```
-It is a simple helm install. Check [./cluster/cert-manager/install.sh](./cluster/cert-manager/install.sh)
+It is a simple helm installation. Check [./cluster/cert-manager/install.sh](./cluster/cert-manager/install.sh)
 
 ### Let's mesh it
 #### PKI
 At least we need trust anchors for linkerd in each cluster, also identity certificate issuer for meshing and
-authorization at services level. If you need something special, then you should check
+authorization at service level. If you need something special, then you should check
 [Linkerd Installation Docs](https://linkerd.io/2-edge/tasks/install-helm/).
 
-In our case we will use simple self-signed certs managed by cert manager.
-Following script will do all dirty work for you.
+In our case, we will use simple self-signed certs managed by cert manager.
+The following script will do all dirty work for you.
 ```shell
 ./cluster/linkerd/init.sh c1 c2 c3
 ```
 Check [./cluster/linkerd/init.sh](./cluster/linkerd/init.sh) for more details.
 
-Next point is that we plan to have not only cluster level mesh but also multicluster mesh. So we need to exchange trust
+Next point is that we plan to have not only clustered level mesh but also multicluster mesh. So we need to exchange trust
 chains between clusters (as soon each cluster manages its own trust chain).
 ```shell
 ./cluster/linkerd-multicluster/key-exchange.sh c1 c2 c3
 ```
 Check [./cluster/linkerd-multicluster/key-exchange.sh](./cluster/linkerd-multicluster/key-exchange.sh) for more details.
 
-> **_NOTE:_**  Check Expiry dates on certs and issues.
+> **_NOTE:_** Check Expiry dates on certs and issues.
 > Root: [./cluster/linkerd/linkerd-root-ca.yaml](./cluster/linkerd/linkerd-root-ca.yaml)
 > Identity: [./cluster/linkerd/linkerd-identity-issuer.yaml](./cluster/linkerd/linkerd-identity-issuer.yaml)
-> After their expiration they will be reissued and you need to exchange keys once more.
+> After their expiration they will be reissued, and you need to exchange keys once more.
 
 
 #### Install linkerd
@@ -215,13 +215,13 @@ Check [./cluster/linkerd-multicluster/key-exchange.sh](./cluster/linkerd-multicl
 
 ### Some observability stuff
 #### Grafana/Prometheus Stack
-Quite simple helm install.
+Quite simple helm installs.
 ```shell
 ./cluster/grafana/install.sh c1 c2 c3
 ```
 Check [./cluster/grafana/install.sh](./cluster/grafana/install.sh)
 #### Linkerd-viz
-Just a simple linkerd dashboard on same prometheus instance. Also some linkerd pod/service monitors.
+Just a simple linkerd dashboard on the same prometheus instance. Also, some linkerd pod/service monitors.
 ```shell
 ./cluster/linkerd-viz/install.sh c1 c2 c3 
 ```
@@ -232,14 +232,14 @@ Just a simple linkerd dashboard on same prometheus instance. Also some linkerd p
 ```
 
 ### SOME NOTE ABOUT IPs.
-Sadly but in most cases we rely on LoadBalancer services with dynamic IP. Which actually could change so we refer nodes
+Sadly but in most cases, we rely on LoadBalancer services with dynamic IP. Which actually could change so we refer nodes
 DNS names instead of IP. k3d-[cluster name]-server-0 for linkerd gateways and k3d-[cluster name]-agent-0 for nats 
 ingress connections (gateways 7222).
-It is not mandatory due fact that all LoadBalancer services exposed on all nodes. This just FYI.
+It is not mandatory due fact that all LoadBalancer services are exposed on all nodes. This is just FYI.
 
 ### VERY IMPORTANT NOTE!
-In terms of resource consumption k3d not starting clusters with large number of pods (our case actually). So to start
-clusters we could use helper script.
+In terms of resource consumption, k3d is not starting clusters with a large number of pods (our case actually). So to start
+clusters, we could use a helper script.
 ```shell
 ./cluster/start.sh c1 c2 c3
 ```
@@ -255,7 +255,7 @@ What will be installed. At each k8s cluster we will install NTS cluster with
 So we will have a cluster in each Kubernetes cluster (let's call it datacenter). Nats clusters will be 'c1' 'c2' 'c3'
 and 'xr-js'.
 
-Clusters will contain three nodes of each type (nats, nats-js and nats-gw) so nine nodes in each. Beside this we will
+Clusters will contain three nodes of each type (nats, nats-js and nats-gw) so nine nodes in each. Besides this we will
 have three nodes for xr-js cluster in each datacenter (nine xr-js nodes).
 
 All clusters will be interconnected in NATS SuperCluster, so it will be 36 nodes SuperCluster with 18 nodes for JetStream.
@@ -265,14 +265,14 @@ All clusters will be interconnected in NATS SuperCluster, so it will be 36 nodes
 ```
 
 ### Setting up local cli
-We deployed cluster with two predefined accounts SYS: 
+We deployed a cluster with two predefined accounts SYS: 
 * SYS (username=sys, password=sys) is a system operator. Other words super root for nats.
-* JS (username=js, password=js) is stream enabled operator (it can't be sys).
+* JS (username=js, password=js) is a stream enabled operator (it can't be sys).
 
 #### Connectivity
-First of all we need to have connection to any servers that located in clusters. Fortunately, we already exposed 4222 
-port through haproxy ingress pointing to Seed cluster. So we just need to expose this ports to host.
-As soon we have Super Cluster we don't care which cluster we will be connected. Let it be c1
+First, we need to have connection to any servers that are located in clusters. Fortunately, we already exposed  
+port 4222 through haproxy ingress pointing to Seed cluster. So we just need to expose these ports to host.
+As soon we have SuperCluster we don't care which cluster we will be connected to. Let it be c1
 ```shell
 k3d cluster edit c1 --port-add "4222:4222@loadbalancer"
 ```
@@ -292,15 +292,14 @@ After that, select account you want to play with.
 ```shell
 nats context select c1
 ```
-> **_NOTE:_**  Be sure you are using right context SYS account don't have any JetStream permissions 
-> (any nats stream command will fail). At same time JS account don't have any permissions to manage servers or clusters.
+> **_NOTE:_** Be sure you are using right context SYS account don't have any JetStream permissions 
+> (any NATS stream command will fail). At same time JS account doesn't have any permissions to manage servers or clusters.
 
 List servers:
 ```shell
 nats server list --sort=name
 ```
-
-Running nats client supposed to be something like this:
+Running NATS client is supposed to be something like this:
 ```
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                          Server Overview                                                          │
@@ -367,7 +366,8 @@ Just delete K3D clusters. :)
 ./cluster/delete.sh c1 c2 c3
 ```
 ## TODO:
-- [ ] Websockets and Leafnodes?
+- [ ] Fix TODO in key-exchange
+- [ ] Websockets and LeafNodes?
 - [ ] JWT Authentication
 - [ ] KV Tests
 - [ ] Strong consistency Cross-Region Stream example
